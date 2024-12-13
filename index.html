@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>노션 클로닝 프로젝트</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        background-color: #7ec850; /* 배경색 설정 */
+      }
+      #sidebar {
+        width: 250px;
+        background-color: #6bb34a; /* 사이드바 배경색 */
+        color: white;
+        padding: 10px;
+        box-sizing: border-box;
+        overflow-y: auto;
+      }
+      #editor {
+        flex-grow: 1;
+        background-color: #a0d888; /* 에디터 배경색 */
+        color: white;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+      }
+      .document {
+        cursor: pointer;
+        padding: 10px;
+        margin-bottom: 5px;
+        border: 1px solid #ddd;
+        background-color: #88cdf6; /* 문서 배경색 */
+        color: white;
+        border-radius: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .document:hover {
+        background-color: #5bb7e5; /* Hover 효과 */
+      }
+      .active {
+        background-color: #7bcaf2; /* 활성화된 문서 색상 */
+      }
+      .delete-btn,
+      .edit-btn {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        margin-left: 10px;
+      }
+      textarea {
+        width: 100%;
+        height: calc(100vh - 40px);
+        border: none;
+        outline: none;
+        resize: none;
+        font-size: 16px;
+        background-color: #a0d888;
+        color: white;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: #88cdf6;
+        border: none;
+        color: white;
+        font-size: 16px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #5bb7e5;
+      }
+      .nested-documents {
+        margin-left: 15px;
+        padding-left: 10px;
+        border-left: 2px solid #88cdf6;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar">
+      <button id="addDocument">+ New Document</button>
+      <div id="documentList"></div>
+    </div>
+    <div id="editor">
+      <textarea
+        id="editorContent"
+        placeholder="편집기를 선택하거나 새 문서를 생성하세요..."
+      ></textarea>
+    </div>
+
+    <script>
+      const documentList = document.getElementById("documentList");
+      const editorContent = document.getElementById("editorContent");
+      const addDocumentButton = document.getElementById("addDocument");
+
+      let documents = JSON.parse(localStorage.getItem("documents")) || [];
+      let currentDocumentId = null;
+
+      function renderDocumentList() {
+        documentList.innerHTML = "";
+        documents.forEach((doc, index) =>
+          renderDocument(doc, index, documentList, documents)
+        );
+      }
+
+      function renderDocument(doc, index, parentElement, parentArray) {
+        const div = document.createElement("div");
+        div.className = "document";
+        if (doc === documents[currentDocumentId]) div.classList.add("active");
+
+        const titleSpan = document.createElement("span");
+        titleSpan.textContent = doc.title;
+
+        const deleteButton = document.createElement("button");
+        deleteButton.textContent = "삭제";
+        deleteButton.className = "delete-btn";
+        deleteButton.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteDocument(index, parentArray);
+        });
+
+        const editButton = document.createElement("button");
+        editButton.textContent = "편집";
+        editButton.className = "edit-btn";
+        editButton.addEventListener("click", (e) => {
+          e.stopPropagation();
+          editDocumentTitle(index, parentArray);
+        });
+
+        const addChildButton = document.createElement("button");
+        addChildButton.textContent = "+ 하위 문서";
+        addChildButton.className = "edit-btn";
+        addChildButton.addEventListener("click", (e) => {
+          e.stopPropagation();
+          addChildDocument(index, parentArray);
+        });
+
+        div.appendChild(titleSpan);
+        div.appendChild(addChildButton);
+        div.appendChild(editButton);
+        div.appendChild(deleteButton);
+
+        parentElement.appendChild(div);
+
+        if (doc.children && doc.children.length > 0) {
+          const nestedContainer = document.createElement("div");
+          nestedContainer.className = "nested-documents";
+          doc.children.forEach((childDoc, childIndex) => {
+            renderDocument(childDoc, childIndex, nestedContainer, doc.children);
+          });
+          parentElement.appendChild(nestedContainer);
+        }
+      }
+
+      function selectDocument(index) {
+        currentDocumentId = index;
+        editorContent.value = documents[index].content;
+        renderDocumentList();
+      }
+
+      function saveCurrentDocument() {
+        if (currentDocumentId !== null) {
+          documents[currentDocumentId].content = editorContent.value;
+          localStorage.setItem("documents", JSON.stringify(documents));
+        }
+      }
+
+      function addNewDocument() {
+        const newDoc = {
+          title: `루트 문서${documents.length + 1}`,
+          content: "",
+          children: [],
+        };
+        documents.push(newDoc);
+        localStorage.setItem("documents", JSON.stringify(documents));
+        renderDocumentList();
+        selectDocument(documents.length - 1);
+      }
+
+      function addChildDocument(parentIndex, parentArray) {
+        const childDoc = {
+          title: `하위 문서${parentArray[parentIndex].children.length + 1}`,
+          content: "",
+          children: [],
+        };
+        parentArray[parentIndex].children.push(childDoc);
+        localStorage.setItem("documents", JSON.stringify(documents));
+        renderDocumentList();
+      }
+
+      function deleteDocument(index, parentArray) {
+        parentArray.splice(index, 1);
+        if (
+          documents[currentDocumentId] &&
+          documents[currentDocumentId].content === ""
+        ) {
+          currentDocumentId = null;
+          editorContent.value = "";
+        }
+        localStorage.setItem("documents", JSON.stringify(documents));
+        renderDocumentList();
+      }
+
+      function editDocumentTitle(index, parentArray) {
+        const newTitle = prompt(
+          "새 문서 이름을 입력하세요:",
+          parentArray[index].title
+        );
+        if (newTitle) {
+          parentArray[index].title = newTitle;
+          localStorage.setItem("documents", JSON.stringify(documents));
+          renderDocumentList();
+        }
+      }
+
+      editorContent.addEventListener("input", saveCurrentDocument);
+      addDocumentButton.addEventListener("click", addNewDocument);
+
+      // Initial render
+      renderDocumentList();
+    </script>
+  </body>
+</html>
